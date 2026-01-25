@@ -1,0 +1,65 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+
+# Binaries for programs and plugins
+bin/
+dist/
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Aider
+.aider*
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+command_log*
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Secrets
+secret*
+secret.sh
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build artifacts
+coverage.txt
+profile.out
+
+# Misc
+*--system_prompt=*
