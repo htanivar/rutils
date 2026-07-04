@@ -2,250 +2,158 @@
 
 ## Overview
 
-The email package provides functionality for sending emails via SMTP with support for attachments, HTML content, and various email features. It follows a simple client-message pattern for sending emails.
+The `email` package provides high-level functionality for sending emails via SMTP. It supports plain text, HTML alternatives, multiple recipients (To, CC, BCC), attachments, and connection-reuse for batch sends. Crucially, it features modern Go support for `context.Context` cancellation and timeout control.
 
-## Key Components
+## API Reference
 
-### Email Client
+### Configuration
 
-The `Client` type handles the SMTP connection and email sending logic.
+#### Config
+Configures the SMTP client.
+```go
+type Config struct {
+	Host     string // SMTP server host (e.g. "smtp.gmail.com")
+	Port     int    // SMTP server port (e.g. 587)
+	Username string // Username/email for auth
+	Password string // Password or App Password
+	From     string // Sender email address (From header)
+}
+```
+
+---
+
+### Client
 
 #### NewClient
+Creates a new email client config.
 ```go
-c := email.NewClient(host, port, username, password)
+func NewClient(cfg *Config) *Client
 ```
 
-Creates a new email client with the specified SMTP server credentials.
-
-**Parameters:**
-- `host`: SMTP server hostname (e.g., "smtp.gmail.com")
-- `port`: SMTP server port (e.g., 587)
-- `username`: SMTP username
-- `password`: SMTP password
+#### NewClientWithDialer
+Creates a client using a mockable or custom `dialer` interface (useful for unit tests).
+```go
+func NewClientWithDialer(from string, d dialer) *Client
+```
 
 #### Send
+Sends a single email message using a background context.
 ```go
-err := client.Send(msg)
+func (c *Client) Send(msg *Message) error
 ```
 
-Sends an email message through the SMTP server.
+#### SendWithContext
+Sends a single email message with context cancellation and timeout support.
+```go
+func (c *Client) SendWithContext(ctx context.Context, msg *Message) error
+```
 
-**Parameters:**
-- `msg`: Pointer to an email.Message struct
+#### SendBatch
+Sends multiple messages in a batch. Reuses the SMTP connection.
+```go
+func (c *Client) SendBatch(msgs []*Message) error
+```
 
-**Returns:**
-- `error`: nil if successful, error if failed to send
+#### SendBatchWithContext
+Sends multiple messages in a batch with context cancellation support.
+```go
+func (c *Client) SendBatchWithContext(ctx context.Context, msgs []*Message) error
+```
 
-### Email Message
+---
 
-The `Message` struct defines the content and recipients of an email.
+### Message
 
+#### Message Struct
+Defines the content and recipients of an email.
 ```go
 type Message struct {
-	From       string
-	To         []string
-	CC         []string
-	BCC        []string
-	ReplyTo    []string
-	Subject    string
-	Body       string
-	HTMLBody   string
-	Attachments []File
+	To          []string // Primary recipients
+	CC          []string // Carbon-copy recipients
+	BCC         []string // Blind carbon-copy recipients
+	Subject     string   // Subject line
+	Body        string   // Plain text body alternative
+	HTMLBody    string   // HTML body content
+	Attachments []string // File paths of attachments to include
 }
 ```
 
-**Fields:**
-- `From`: Sender email address
-- `To`: Recipient email addresses (slice)
-- `CC`: Carbon copy recipients (slice)
-- `BCC`: Blind carbon copy recipients (slice)
-- `ReplyTo`: Reply-to addresses (slice)
-- `Subject`: Email subject line
-- `Body`: Plain text body content
-- `HTMLBody`: HTML body content
-- `Attachments`: Slice of File structs for file attachments
+---
 
-### File Attachment
+## Code Examples
 
-The `File` struct represents a file attachment.
-
+### Sending an Email with Timeout
 ```go
-type File struct {
-	Name string
-	Data []byte
+package main
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/htanivar/rutils/email"
+)
+
+func main() {
+	client := email.NewClient(&email.Config{
+		Host:     "smtp.mailtrap.io",
+		Port:     2525,
+		Username: "my_username",
+		Password: "my_password",
+		From:     "sender@example.com",
+	})
+
+	msg := &email.Message{
+		To:       []string{"recipient@example.com"},
+		Subject:  "Hello!",
+		Body:     "This is the plain text fallback.",
+		HTMLBody: "<h1>Hello!</h1><p>This is the HTML body.</p>",
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.SendWithContext(ctx, msg); err != nil {
+		log.Fatalf("failed to send: %v", err)
+	}
 }
 ```
 
-**Fields:**
-- `Name`: Name of the file as it will appear in the email
-- `Data`: Raw byte data of the file
-
-### Message Creation Functions
-
-Utility functions for creating common message types:
-
-#### NewPlainTextMessage
+### Sending a Batch of Emails
 ```go
-msg := email.NewPlainTextMessage(to, subject, body)
-```
+package main
 
-Creates a new message with plain text content.
+import (
+	"context"
+	"log"
 
-**Parameters:**
-- `to`: Recipient email address
-- `subject`: Email subject
-- `body`: Plain text body content
+	"github.com/htanivar/rutils/email"
+)
 
-**Returns:**
-- `*Message`: Pointer to a new Message struct
+func main() {
+	client := email.NewClient(&email.Config{
+		Host:     "smtp.mailtrap.io",
+		Port:     2525,
+		Username: "my_username",
+		Password: "my_password",
+		From:     "sender@example.com",
+	})
 
-#### NewHTMLMessage
-```go
-msg := email.NewHTMLMessage(to, subject, html)
-```
+	msgs := []*email.Message{
+		{
+			To:      []string{"user1@example.com"},
+			Subject: "Digest 1",
+			Body:    "Digest details for user 1",
+		},
+		{
+			To:      []string{"user2@example.com"},
+			Subject: "Digest 2",
+			Body:    "Digest details for user 2",
+		},
+	}
 
-Creates a new message with HTML content.
-
-**Parameters:**
-- `to`: Recipient email address
-- `subject`: Email subject
-- `html`: HTML body content
-
-**Returns:**
-- `*Message`: Pointer to a new Message struct
-
-## Usage Examples
-
-### Sending a Plain Text Email
-
-```go
-// Create email client
-c := email.NewClient("smtp.gmail.com", 587, "user@gmail.com", "password")
-
-// Create plain text message
-msg := email.NewPlainTextMessage("recipient@example.com", "Test Subject", "Hello World!")
-
-// Send the email
-if err := c.Send(msg); err != nil {
-	log.Fatal(err)
+	if err := client.SendBatchWithContext(context.Background(), msgs); err != nil {
+		log.Fatalf("failed to send batch: %v", err)
+	}
 }
 ```
-
-### Sending an HTML Email
-
-```go
-// Create email client
-c := email.NewClient("smtp.gmail.com", 587, "user@gmail.com", "password")
-
-// Create HTML message
-htmlContent := "<h1>Hello World!</h1><p>This is an HTML email!</p>"
-msg := email.NewHTMLMessage("recipient@example.com", "Test HTML Email", htmlContent)
-
-// Send the email
-if err := c.Send(msg); err != nil {
-	log.Fatal(err)
-}
-```
-
-### Sending an Email with Attachment
-
-```go
-// Read file data
-fileData, err := os.ReadFile("/path/to/document.pdf")
-if err != nil {
-	log.Fatal(err)
-}
-
-// Create email client
-c := email.NewClient("smtp.gmail.com", 587, "user@gmail.com", "password")
-
-// Create message
-msg := email.NewPlainTextMessage("recipient@example.com", "Document Attached", "Please find the document attached.")
-
-// Add attachment
-msg.Attachments = []email.File{
-	{
-		Name: "document.pdf",
-		Data: fileData,
-	},
-}
-
-// Send the email
-if err := c.Send(msg); err != nil {
-	log.Fatal(err)
-}
-```
-
-### Sending an Email with Multiple Recipients
-
-```go
-// Create email client
-c := email.NewClient("smtp.gmail.com", 587, "user@gmail.com", "password")
-
-// Create message with multiple recipients
-msg := &email.Message{
-	To:    []string{"recipient1@example.com", "recipient2@example.com"},
-	CC:    []string{"cc@example.com"},
-	BCC:   []string{"bcc@example.com"},
-	ReplyTo: []string{"replyto@example.com"},
-	Subject: "Multiple Recipients",
-	Body:    "This email has multiple recipients.",
-}
-
-// Send the email
-if err := c.Send(msg); err != nil {
-	log.Fatal(err)
-}
-```
-
-## Testing
-
-The email package includes comprehensive tests that mock the SMTP client for testing without actually sending emails. Tests cover:
-- Plain text messages
-- HTML messages
-- Email with attachments
-- Various error conditions
-- Mock SMTP server responses
-
-Run tests with:
-```bash
-make test-email
-```
-
-## Error Handling
-
-The email package handles various error conditions:
-- Network connectivity issues
-- Authentication failures
-- Invalid email addresses
-- Message formatting issues
-
-Errors are returned from the Send method and should be checked by the caller.
-
-## Dependencies
-
-The email package uses the following external dependency:
-- `gopkg.in/mail.v2`: For SMTP email sending functionality
-
-This dependency is specified in the go.mod file and will be automatically downloaded when the package is imported.
-
-## Security Considerations
-
-- SMTP credentials should be stored securely (e.g., environment variables, secret management systems)
-- Consider using app-specific passwords for services like Gmail
-- Validate recipient email addresses to prevent email injection attacks
-- Sanitize HTML content to prevent XSS attacks in HTML emails
-
-## Performance
-
-- The client reuses SMTP connections when possible
-- Large attachments may impact performance due to memory usage
-- Consider chunking large files or using file streaming for very large attachments
-
-## Future Improvements
-
-- Add support for OAuth2 authentication
-- Implement connection pooling for high-volume email sending
-- Add support for email templates
-- Implement rate limiting to prevent spam
-- Add DKIM/SPF support for improved email deliverability

@@ -1,4 +1,4 @@
-package path
+package pathutil
 
 import (
 	"errors"
@@ -13,8 +13,8 @@ var (
 	ErrEmpty        = errors.New("directory is empty")
 )
 
-// MustExists returns nil if the file at the given path exists, otherwise returns ErrNotExist
-func MustExists(path string) error {
+// Exists returns nil if the file at the given path exists, otherwise returns ErrNotExist
+func Exists(path string) error {
 	_, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -26,8 +26,8 @@ func MustExists(path string) error {
 	return nil
 }
 
-// MustNotExist returns nil if the file at the given path does not exist, otherwise returns ErrExists
-func MustNotExist(path string) error {
+// NotExist returns nil if the file at the given path does not exist, otherwise returns ErrExists
+func NotExist(path string) error {
 	_, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -39,8 +39,8 @@ func MustNotExist(path string) error {
 	return ErrExists // File exists - this is an error for this function
 }
 
-// MustBeEmpty returns nil if the directory at the given path is empty, otherwise returns an error
-func MustBeEmpty(path string) error {
+// BeEmpty returns nil if the directory at the given path is empty, otherwise returns an error
+func BeEmpty(path string) error {
 	// First check if path exists
 	info, err := os.Stat(path)
 	if err != nil {
@@ -69,8 +69,8 @@ func MustBeEmpty(path string) error {
 	return nil
 }
 
-// MustNotBeEmpty returns nil if the directory at the given path is not empty, otherwise returns an error
-func MustNotBeEmpty(path string) error {
+// NotBeEmpty returns nil if the directory at the given path is not empty, otherwise returns an error
+func NotBeEmpty(path string) error {
 	// First check if path exists
 	info, err := os.Stat(path)
 	if err != nil {
@@ -97,4 +97,32 @@ func MustNotBeEmpty(path string) error {
 	}
 
 	return nil
+}
+
+// MustExist panics if the file at the given path does not exist.
+func MustExist(path string) {
+	if err := Exists(path); err != nil {
+		panic(err)
+	}
+}
+
+// MustNotExist panics if the file at the given path exists.
+func MustNotExist(path string) {
+	if err := NotExist(path); err != nil {
+		panic(err)
+	}
+}
+
+// MustBeEmpty panics if the directory at the given path is not empty.
+func MustBeEmpty(path string) {
+	if err := BeEmpty(path); err != nil {
+		panic(err)
+	}
+}
+
+// MustNotBeEmpty panics if the directory at the given path is empty.
+func MustNotBeEmpty(path string) {
+	if err := NotBeEmpty(path); err != nil {
+		panic(err)
+	}
 }

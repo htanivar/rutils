@@ -1,6 +1,7 @@
 package email
 
 import (
+	"context"
 	"fmt"
 
 	"gopkg.in/mail.v2"
@@ -52,61 +53,95 @@ type Message struct {
 	Attachments []string // file paths
 }
 
+// Send sends an email message.
 func (c *Client) Send(msg *Message) error {
-	m := mail.NewMessage()
-	m.SetHeader("From", c.from)
-	m.SetHeader("To", msg.To...)
-
-	if len(msg.CC) > 0 {
-		m.SetHeader("Cc", msg.CC...)
-	}
-	if len(msg.BCC) > 0 {
-		m.SetHeader("Bcc", msg.BCC...)
-	}
-
-	m.SetHeader("Subject", msg.Subject)
-
-	if msg.HTMLBody != "" {
-		m.SetBody("text/html", msg.HTMLBody)
-		if msg.Body != "" {
-			m.AddAlternative("text/plain", msg.Body)
-		}
-	} else {
-		m.SetBody("text/plain", msg.Body)
-	}
-
-	for _, path := range msg.Attachments {
-		m.Attach(path)
-	}
-
-	if err := c.dialer.DialAndSend(m); err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-	return nil
+	return c.SendWithContext(context.Background(), msg)
 }
 
-func (c *Client) SendBatch(msgs []*Message) error {
-	sender, err := c.dialer.Dial()
-	if err != nil {
-		return fmt.Errorf("failed to dial: %w", err)
-	}
-	defer sender.Close()
-
-	for _, msg := range msgs {
+// SendWithContext sends an email message with context support for timeout/cancellation.
+func (c *Client) SendWithContext(ctx context.Context, msg *Message) error {
+	return runWithContext(ctx, func() error {
 		m := mail.NewMessage()
 		m.SetHeader("From", c.from)
 		m.SetHeader("To", msg.To...)
+
+		if len(msg.CC) > 0 {
+			m.SetHeader("Cc", msg.CC...)
+		}
+		if len(msg.BCC) > 0 {
+			m.SetHeader("Bcc", msg.BCC...)
+		}
+
 		m.SetHeader("Subject", msg.Subject)
 
 		if msg.HTMLBody != "" {
 			m.SetBody("text/html", msg.HTMLBody)
+			if msg.Body != "" {
+				m.AddAlternative("text/plain", msg.Body)
+			}
 		} else {
 			m.SetBody("text/plain", msg.Body)
 		}
 
-		if err := mail.Send(sender, m); err != nil {
-			return fmt.Errorf("failed to send batch email: %w", err)
+		for _, path := range msg.Attachments {
+			m.Attach(path)
 		}
+
+		if err := c.dialer.DialAndSend(m); err != nil {
+			return fmt.Errorf("failed to send email: %w", err)
+		}
+		return nil
+	})
+}
+
+// SendBatch sends multiple emails in a batch using a single connection.
+func (c *Client) SendBatch(msgs []*Message) error {
+	return c.SendBatchWithContext(context.Background(), msgs)
+}
+
+// SendBatchWithContext sends multiple emails in a batch with context support.
+func (c *Client) SendBatchWithContext(ctx context.Context, msgs []*Message) error {
+	return runWithContext(ctx, func() error {
+		sender, err := c.dialer.Dial()
+		if err != nil {
+			return fmt.Errorf("failed to dial: %w", err)
+		}
+		defer sender.Close()
+
+		for _, msg := range msgs {
+			// Check if context has been cancelled during the batch send loop
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
+			m := mail.NewMessage()
+			m.SetHeader("From", c.from)
+			m.SetHeader("To", msg.To...)
+			m.SetHeader("Subject", msg.Subject)
+
+			if msg.HTMLBody != "" {
+				m.SetBody("text/html", msg.HTMLBody)
+			} else {
+				m.SetBody("text/plain", msg.Body)
+			}
+
+			if err := mail.Send(sender, m); err != nil {
+				return fmt.Errorf("failed to send batch email: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+func runWithContext(ctx context.Context, fn func() error) error {
+	ch := make(chan error, 1)
+	go func() {
+		ch <- fn()
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-ch:
+		return err
 	}
-	return nil
 }

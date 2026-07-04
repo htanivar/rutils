@@ -1,33 +1,43 @@
 package file
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/htanivar/rutils/path"
+	"github.com/htanivar/rutils/pathutil"
 )
 
 var (
 	ErrInvalidType = errors.New("file type does not match expected extension")
 )
 
-// MustBeType validates that the file at filePath actually matches the expected extension type
+// ValidateType validates that the file at filePath actually matches the expected extension type
 // Supported extensions: .csv, .json, .xml, .pdf, .zip, .txt
-func MustBeType(ext, filePath string) error {
+func ValidateType(ext, filePath string) error {
 	// Normalize extension (ensure it starts with .)
 	if !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
 	}
 	ext = strings.ToLower(ext)
 
+	// Check if file extension matches expected extension
+	actualExt := strings.ToLower(filepath.Ext(filePath))
+	if actualExt != ext {
+		return ErrInvalidType
+	}
+
+
 	// Check if file exists
-	if err := path.MustExists(filePath); err != nil {
+	if err := pathutil.Exists(filePath); err != nil {
 		return err
 	}
 
@@ -59,7 +69,7 @@ func MustBeType(ext, filePath string) error {
 	case ".pdf":
 		return validatePDF(buf)
 	case ".zip":
-		return validateZIP(buf)
+		return validateZIP(filePath)
 	case ".txt":
 		return validateText(buf)
 	default:
@@ -69,6 +79,13 @@ func MustBeType(ext, filePath string) error {
 			return ErrInvalidType
 		}
 		return nil
+	}
+}
+
+// MustBeType validates that the file at filePath matches the expected extension type, and panics on failure
+func MustBeType(ext, filePath string) {
+	if err := ValidateType(ext, filePath); err != nil {
+		panic(err)
 	}
 }
 
@@ -148,29 +165,9 @@ func validateCSV(filePath string) error {
 		return ErrInvalidType
 	}
 
-	// Validate column consistency
-	// All records should have the same number of fields
-	expectedCols := len(records[0])
-	if expectedCols == 0 {
-		return ErrInvalidType
-	}
-
-	for _, rec := range records {
-		if len(rec) != expectedCols {
-			// Allow some tolerance for trailing empty fields
-			// but reject if difference is significant
-			diff := expectedCols - len(rec)
-			if diff < 0 {
-				diff = -diff
-			}
-			if diff > 0 {
-				return ErrInvalidType
-			}
-		}
-	}
-
 	return nil
 }
+
 
 func validateJSON(buf []byte) error {
 	trim := bytes.TrimSpace(buf)
@@ -179,6 +176,12 @@ func validateJSON(buf []byte) error {
 	}
 	// JSON must start with { or [
 	if trim[0] != '{' && trim[0] != '[' {
+		return ErrInvalidType
+	}
+	// Check if we can decode the first token to verify structure
+	dec := json.NewDecoder(bytes.NewReader(trim))
+	_, err := dec.Token()
+	if err != nil {
 		return ErrInvalidType
 	}
 	return nil
@@ -193,6 +196,11 @@ func validateXML(buf []byte) error {
 	if trim[0] != '<' {
 		return ErrInvalidType
 	}
+	dec := xml.NewDecoder(bytes.NewReader(trim))
+	_, err := dec.Token()
+	if err != nil {
+		return ErrInvalidType
+	}
 	return nil
 }
 
@@ -204,14 +212,12 @@ func validatePDF(buf []byte) error {
 	return nil
 }
 
-func validateZIP(buf []byte) error {
-	// ZIP magic number: PK\x03\x04
-	if len(buf) < 4 {
+func validateZIP(filePath string) error {
+	z, err := zip.OpenReader(filePath)
+	if err != nil {
 		return ErrInvalidType
 	}
-	if !bytes.HasPrefix(buf, []byte("PK\x03\x04")) {
-		return ErrInvalidType
-	}
+	z.Close()
 	return nil
 }
 
