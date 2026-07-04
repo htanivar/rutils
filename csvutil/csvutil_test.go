@@ -1,7 +1,6 @@
-package task
+package csvutil
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,17 +19,7 @@ func writeTempFile(t *testing.T, name, content string) string {
 	return path
 }
 
-func TestCSVToRecords_TableDriven(t *testing.T) {
-	orig := mustBeType
-	t.Cleanup(func() { mustBeType = orig })
-
-	mustBeType = func(path, ext string) error {
-		if filepath.Ext(path) != ".csv" {
-			return errors.New("invalid type")
-		}
-		return nil
-	}
-
+func TestCSVToRecords(t *testing.T) {
 	tests := []struct {
 		name        string
 		filename    string
@@ -70,7 +59,7 @@ Alice,30`,
 			wantLen:  0,
 		},
 		{
-			name:        "non csv file",
+			name:        "non csv file (txt ext)",
 			filename:    "test.txt",
 			content:     `dummy`,
 			expectError: true,

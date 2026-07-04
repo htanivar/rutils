@@ -1,4 +1,4 @@
-package task
+package csvutil
 
 import (
 	"encoding/csv"
@@ -8,10 +8,9 @@ import (
 	"github.com/htanivar/rutils/file"
 )
 
-var mustBeType = file.MustBeType
-
+// CSVToRecords reads a CSV file and converts it to a slice of map records.
 func CSVToRecords(path string) ([]map[string]string, error) {
-	if err := mustBeType(path, "csv"); err != nil {
+	if err := file.ValidateType(".csv", path); err != nil {
 		return nil, err
 	}
 

@@ -1,6 +1,4 @@
-// Package string provides string manipulation utilities.
-// Run tests with `go test ./string` from the module root, or `make test-string`.
-package string
+package strutil
 
 import (
 	"testing"

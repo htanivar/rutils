@@ -1,15 +1,31 @@
 package file_test
 
 import (
+	"archive/zip"
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/htanivar/rutils/file"
-	"github.com/htanivar/rutils/path"
+	"github.com/htanivar/rutils/pathutil"
 )
 
-func TestMustBeType(t *testing.T) {
+func createValidZIP(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	f, err := w.Create("test.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.Write([]byte("test content"))
+	_ = w.Close()
+	return buf.Bytes()
+}
+
+func TestValidateType(t *testing.T) {
 	tmp := t.TempDir()
 
 	write := func(name string, b []byte) string {
@@ -26,7 +42,7 @@ func TestMustBeType(t *testing.T) {
 	jsonPath := write("ok.json", []byte(`{"a":1}`))
 	xmlPath := write("ok.xml", []byte(`<?xml version="1.0" encoding="UTF-8"?><root></root>`))
 	pdfPath := write("ok.pdf", []byte("%PDF-1.4\n%...\n"))
-	zipPath := write("ok.zip", []byte("PK\x03\x04"+"rest"))
+	zipPath := write("ok.zip", createValidZIP(t))
 	txtPath := write("ok.txt", []byte("hello\nworld\n"))
 
 	// Bad samples / mismatches
@@ -62,19 +78,19 @@ func TestMustBeType(t *testing.T) {
 		{name: "unknown ext matches filename", ext: ".foo", filePath: write("x.foo", []byte("whatever")), wantErr: false},
 		{name: "unknown ext mismatches filename", ext: ".foo", filePath: write("x.bar", []byte("whatever")), wantErr: true, expectErr: file.ErrInvalidType},
 
-		// Missing file => should return MustExists error (ErrNotExist in your package)
-		{name: "file does not exist", ext: ".csv", filePath: nonExist, wantErr: true, expectErr: path.ErrNotExist},
+		// Missing file => should return Exists error (ErrNotExist)
+		{name: "file does not exist", ext: ".csv", filePath: nonExist, wantErr: true, expectErr: pathutil.ErrNotExist},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := file.MustBeType(tt.ext, tt.filePath)
+			err := file.ValidateType(tt.ext, tt.filePath)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				if tt.expectErr != nil && err != tt.expectErr {
+				if tt.expectErr != nil && !errors.Is(err, tt.expectErr) {
 					t.Fatalf("expected error %v, got %v", tt.expectErr, err)
 				}
 			} else {
@@ -84,4 +100,35 @@ func TestMustBeType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMustBeType(t *testing.T) {
+	tmp := t.TempDir()
+	jsonPath := filepath.Join(tmp, "ok.json")
+	if err := os.WriteFile(jsonPath, []byte(`{"a":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("should not panic when type matches", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("MustBeType panicked unexpectedly: %v", r)
+			}
+		}()
+		file.MustBeType(".json", jsonPath)
+	})
+
+	t.Run("should panic when type does not match", func(t *testing.T) {
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Error("expected MustBeType to panic")
+			}
+			err, ok := r.(error)
+			if !ok || !errors.Is(err, file.ErrInvalidType) {
+				t.Errorf("expected panic with ErrInvalidType, got %v", r)
+			}
+		}()
+		file.MustBeType(".csv", jsonPath)
+	})
 }

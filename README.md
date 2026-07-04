@@ -1,15 +1,17 @@
 # rutils
 
-rutils is a Go utility library that provides various helper functions for common tasks such as email notifications, file validation, path checking, map validation, string utilities, and data conversion. The library follows a consistent pattern of "must" functions that return errors when validation conditions are not met.
+`rutils` is a modern, high-efficiency utility library for Go projects. It is built to leverage Go generics, modern context-based patterns, and idiomatic Go programming paradigms (such as distinguishing between error-returning validation functions and panicking `Must` helper functions).
 
 ## Features
 
-- **Email Notifications**: Send emails with optional attachments and HTML body
-- **File Validation**: Validate file types based on extension and content (CSV, JSON, XML, PDF, ZIP, TXT)
-- **Path Utilities**: Check if files and directories exist, are empty, or meet other conditions
-- **Map Validation**: Check if maps are empty or not empty
-- **String Utilities**: Check if strings are empty and reverse strings
-- **CSV to JSON Conversion**: Convert CSV files to JSON records
+- **`email`**: SMTP email client featuring HTML body alternatives, file attachments, connection reuse for batch sends, and first-class **`context.Context`** cancellation/timeout support.
+- **`file`**: Structured file type and content validation (CSV, JSON, XML, PDF, ZIP, TXT) using robust parsing and signature checking.
+- **`pathutil`**: Idiomatic file and directory existence/emptiness checks.
+- **`maputil`**: Type-safe generic map validation using Go generics (`[K comparable, V any]`).
+- **`strutil`**: String validity verification and rune-wise reversing.
+- **`csvutil`**: Parsing and conversion utilities for reading CSV documents into maps.
+
+---
 
 ## Installation
 
@@ -17,129 +19,157 @@ rutils is a Go utility library that provides various helper functions for common
 go get github.com/htanivar/rutils
 ```
 
+---
+
 ## Usage
 
-Each package in rutils provides "must" functions that return errors when conditions are not met. These functions are designed to be used in validation scenarios where you want to ensure certain conditions are met before proceeding.
+All utility packages implement two patterns:
+1. **Standard functions** (e.g., `Exists`, `ValidateType`, `IsEmpty`) which return standard Go `error` values.
+2. **Panicking "Must" wrappers** (e.g., `MustExist`, `MustBeType`, `MustBeEmpty`) which automatically panic if validation fails, ideal for inline initialization.
 
-### Email Notifications
-
-```go
-import "github.com/htanivar/rutils/email"
-
-client := email.NewClient("smtp.gmail.com", 587, "user@gmail.com", "password")
-
-msg := &email.Message{
-	To:      []string{"recipient@example.com"},
-	Subject: "Test Email",
-	Body:    "This is the email body",
-}
-
-if err := client.Send(msg); err != nil {
-	log.Fatal(err)
-}
-```
-
-### File Validation
+### 1. Email Notifications
+Provides a thread-safe SMTP client with context support for connection timeouts.
 
 ```go
-import "github.com/htanivar/rutils/file"
+import (
+	"context"
+	"log"
+	"time"
 
-// Validate that a file is a CSV file
-if err := file.MustBeType(".csv", "/path/to/file.csv"); err != nil {
-	log.Fatal(err)
-}
-```
+	"github.com/htanivar/rutils/email"
+)
 
-### Path Utilities
+client := email.NewClient(&email.Config{
+	Host:     "smtp.gmail.com",
+	Port:     587,
+	Username: "user@gmail.com",
+	Password: "password",
+	From:     "sender@gmail.com",
+})
 
-```go
-import "github.com/htanivar/rutils/path"
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 
-// Check if a file exists
-if err := path.MustExists("/path/to/file"); err != nil {
-	log.Fatal(err)
-}
-
-// Check if a directory is empty
-if err := path.MustBeEmpty("/path/to/dir"); err != nil {
-	log.Fatal(err)
-}
-```
-
-### Map Validation
-
-```go
-import "github.com/htanivar/rutils/maps"
-
-m := map[string]interface{}{"key": "value"}
-
-// Check if a map is not empty
-if err := maps.MustNotBeEmpty(m); err != nil {
-	log.Fatal(err)
-}
-```
-
-### String Utilities
-
-```go
-import "github.com/htanivar/rutils/string"
-
-// Check if a string is not empty
-s := "hello"
-if err := string.MustNotBeEmpty(s); err != nil {
-	log.Fatal(err)
-}
-
-// Reverse a string
-reversed := string.Reverse(s) // "olleh"
-```
-
-### CSV to JSON Conversion
-
-```go
-import "github.com/htanivar/rutils/task"
-
-// Convert CSV file to JSON records
-records, err := task.CSVToRecords("/path/to/file.csv")
+err := client.SendWithContext(ctx, &email.Message{
+	To:       []string{"recipient@example.com"},
+	Subject:  "Greetings",
+	Body:     "Plain text body alternative",
+	HTMLBody: "<h1>Hello!</h1><p>HTML body</p>",
+})
 if err != nil {
 	log.Fatal(err)
 }
-// records is a slice of map[string]string
 ```
 
-## Package Structure
-
-- **email**: Email notification functionality
-- **file**: File type validation
-- **path**: Path and directory validation
-- **maps**: Map validation
-- **string**: String validation and manipulation
-- **task**: Data conversion utilities
-
-## Error Handling
-
-All "must" functions return specific error types that can be checked:
+### 2. File Validation
+Ensures files match their declared extensions by validating actual content signatures, parsing structure, or reading magic headers.
 
 ```go
-import "errors"
+import (
+	"log"
 
-if errors.Is(err, file.ErrInvalidType) {
-	// Handle invalid file type
-} else if errors.Is(err, path.ErrNotExist) {
-	// Handle file not existing
+	"github.com/htanivar/rutils/file"
+)
+
+// Returns an error if the file isn't a valid CSV
+if err := file.ValidateType("csv", "report.csv"); err != nil {
+	log.Fatal(err)
 }
+
+// Panics inline if not a valid JSON structure
+file.MustBeType(".json", "config.json")
 ```
+
+### 3. Path Utilities
+Checks paths for existence, folder emptiness, and non-emptiness.
+
+```go
+import (
+	"github.com/htanivar/rutils/pathutil"
+)
+
+// Non-panicking
+if err := pathutil.Exists("/data/logs"); err != nil {
+	log.Printf("directory missing: %v", err)
+}
+
+// Panicking helper
+pathutil.MustExist("/etc/config.json")
+pathutil.MustBeEmpty("/tmp/empty_dir")
+```
+
+### 4. Map Validation (Generics)
+Generics-based type-safe validation for Go maps.
+
+```go
+import (
+	"github.com/htanivar/rutils/maputil"
+)
+
+m := map[int]string{1: "active"}
+
+// Check if a map is not empty
+if err := maputil.IsNotEmpty(m); err != nil {
+	log.Fatal(err)
+}
+
+// Panics inline if empty
+maputil.MustNotBeEmpty(m)
+```
+
+### 5. String Utilities
+```go
+import (
+	"fmt"
+
+	"github.com/htanivar/rutils/strutil"
+)
+
+// Check non-emptiness
+if err := strutil.NotEmpty("hello"); err != nil {
+	fmt.Println("string is empty")
+}
+
+// Reverse unicode string
+reversed := strutil.Reverse("Hello, 世界") // "界世 ,olleH"
+```
+
+### 6. CSV parsing
+```go
+import (
+	"log"
+
+	"github.com/htanivar/rutils/csvutil"
+)
+
+records, err := csvutil.CSVToRecords("contacts.csv")
+if err != nil {
+	log.Fatal(err)
+}
+// records is []map[string]string
+```
+
+---
+
+## Package Directory Structure
+
+- **`email`**: SMTP email delivery (batch sending & context support).
+- **`file`**: File extension & MIME content structure verification.
+- **`pathutil`**: Directory/file status checks.
+- **`maputil`**: Generic-safe map emptiness checks.
+- **`strutil`**: Basic string verification & rune reversal.
+- **`csvutil`**: Tabular CSV parsing.
+
+---
 
 ## Testing
 
-Run all tests:
-
+Run all package tests:
 ```bash
 make test
 ```
 
-Run tests for a specific package:
-
+Or run package-specific tests:
 ```bash
 make test-email
 make test-file

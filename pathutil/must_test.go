@@ -1,11 +1,12 @@
-package path
+package pathutil
 
 import (
+	"errors"
 	"os"
 	"testing"
 )
 
-func TestMustExists(t *testing.T) {
+func TestExists(t *testing.T) {
 	// Setup: Create temporary file and directory
 	tmpfile, err := os.CreateTemp("", "example")
 	if err != nil {
@@ -55,13 +56,13 @@ func TestMustExists(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := MustExists(tt.path)
+			err := Exists(tt.path)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Expected error, got nil")
 				}
-				if tt.expectErr != nil && err != tt.expectErr {
+				if tt.expectErr != nil && !errors.Is(err, tt.expectErr) {
 					t.Errorf("Expected error %v, got %v", tt.expectErr, err)
 				}
 			} else {
@@ -73,7 +74,7 @@ func TestMustExists(t *testing.T) {
 	}
 }
 
-func TestMustNotExist(t *testing.T) {
+func TestNotExist(t *testing.T) {
 	// Setup: Create temporary file and directory
 	tmpfile, err := os.CreateTemp("", "example")
 	if err != nil {
@@ -123,13 +124,13 @@ func TestMustNotExist(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := MustNotExist(tt.path)
+			err := NotExist(tt.path)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Expected error, got nil")
 				}
-				if tt.expectErr != nil && err != tt.expectErr {
+				if tt.expectErr != nil && !errors.Is(err, tt.expectErr) {
 					t.Errorf("Expected error %v, got %v", tt.expectErr, err)
 				}
 			} else {
@@ -141,7 +142,7 @@ func TestMustNotExist(t *testing.T) {
 	}
 }
 
-func TestMustBeEmpty(t *testing.T) {
+func TestBeEmpty(t *testing.T) {
 	// Setup: Create temporary empty directory
 	emptyDir, err := os.MkdirTemp("", "emptydir")
 	if err != nil {
@@ -206,13 +207,13 @@ func TestMustBeEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := MustBeEmpty(tt.path)
+			err := BeEmpty(tt.path)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Expected error, got nil")
 				}
-				if tt.expectErr != nil && err != tt.expectErr {
+				if tt.expectErr != nil && !errors.Is(err, tt.expectErr) {
 					t.Errorf("Expected error %v, got %v", tt.expectErr, err)
 				}
 			} else {
@@ -224,7 +225,7 @@ func TestMustBeEmpty(t *testing.T) {
 	}
 }
 
-func TestMustNotBeEmpty(t *testing.T) {
+func TestNotBeEmpty(t *testing.T) {
 	// Setup: empty directory
 	emptyDir, err := os.MkdirTemp("", "emptydir")
 	if err != nil {
@@ -288,13 +289,13 @@ func TestMustNotBeEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := MustNotBeEmpty(tt.path)
+			err := NotBeEmpty(tt.path)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("Expected error, got nil")
 				}
-				if tt.expectErr != nil && err != tt.expectErr {
+				if tt.expectErr != nil && !errors.Is(err, tt.expectErr) {
 					t.Fatalf("Expected error %v, got %v", tt.expectErr, err)
 				}
 			} else {
@@ -304,4 +305,60 @@ func TestMustNotBeEmpty(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMustFunctions(t *testing.T) {
+	// Setup: Create temporary file
+	tmpfile, err := os.CreateTemp("", "example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+	defer tmpfile.Close()
+
+	t.Run("MustExist should not panic when file exists", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("MustExist panicked unexpectedly: %v", r)
+			}
+		}()
+		MustExist(tmpfile.Name())
+	})
+
+	t.Run("MustExist should panic when file does not exist", func(t *testing.T) {
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Error("expected MustExist to panic")
+			}
+			err, ok := r.(error)
+			if !ok || !errors.Is(err, ErrNotExist) {
+				t.Errorf("expected panic with ErrNotExist, got %v", r)
+			}
+		}()
+		MustExist("/tmp/does_not_exist_xyz")
+	})
+
+	t.Run("MustNotExist should not panic when file does not exist", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("MustNotExist panicked unexpectedly: %v", r)
+			}
+		}()
+		MustNotExist("/tmp/does_not_exist_xyz")
+	})
+
+	t.Run("MustNotExist should panic when file exists", func(t *testing.T) {
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Error("expected MustNotExist to panic")
+			}
+			err, ok := r.(error)
+			if !ok || !errors.Is(err, ErrExists) {
+				t.Errorf("expected panic with ErrExists, got %v", r)
+			}
+		}()
+		MustNotExist(tmpfile.Name())
+	})
 }

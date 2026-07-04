@@ -1,6 +1,7 @@
 package email
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -8,6 +9,7 @@ import (
 
 	"gopkg.in/mail.v2"
 )
+
 
 type mockSendCloser struct {
 	sendErr error
@@ -208,3 +210,40 @@ func TestClient_SendBatch(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_SendWithContext_Cancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	md := &mockDialer{}
+	c := NewClientWithDialer("from@x.com", md)
+
+	msg := &Message{
+		To:      []string{"recipient@example.com"},
+		Subject: "Test",
+		Body:    "body",
+	}
+
+	err := c.SendWithContext(ctx, msg)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled error, got: %v", err)
+	}
+}
+
+func TestClient_SendBatchWithContext_Cancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	md := &mockDialer{}
+	c := NewClientWithDialer("from@x.com", md)
+
+	msgs := []*Message{
+		{To: []string{"recipient@example.com"}, Subject: "Test", Body: "body"},
+	}
+
+	err := c.SendBatchWithContext(ctx, msgs)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled error, got: %v", err)
+	}
+}
+
