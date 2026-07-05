@@ -1,66 +1,177 @@
-# Go
+# ============================================
+# GRAPHIFY - Code Knowledge Graph
+# ============================================
+# Generated knowledge graph files (large, environment-specific)
+graphify-out/
+graphify-out/.rebuild.lock
+*.graph.json
+*.graph.db
+
+# ============================================
+# BINARIES & EXECUTABLES
+# ============================================
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-*.test
+*.bin
 *.out
-*.prof
+*.zip
+*.tgz
+rbot.exe
+rbot.bin
 
-# Binaries for programs and plugins
-bin/
-dist/
-
-# Dependency directories
-vendor/
-
-# Go workspace file
-go.work
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
+# ============================================
+# OPERATING SYSTEM FILES
+# ============================================
+# macOS
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
+
+# Windows
 ehthumbs.db
 Thumbs.db
 
-# Aider
-.aider*
-.aider.chat.history.md
-.aider.input.history
-.aider.tags.cache.v4/
-command_log*
+# ============================================
+# IDE & EDITOR FILES
+# ============================================
+# JetBrains (IntelliJ, PyCharm, etc.)
+.idea/
+*.iml
+*.suo
 
-# Logs
-logs
+# Visual Studio
+*.ntvs*
+*.njsproj
+*.sln
+
+# VSCode
+.vscode/
+
+# Vim/Neovim
+*.swp
+*.swo
+*.sw?
+*~
+
+# Other editors
+.todo/
+
+# ============================================
+# DEPENDENCY DIRECTORIES
+# ============================================
+vendor/
+local/
+bin/
+app-data/
+node_modules/
+jspm_packages/
+
+# ============================================
+# BUILD OUTPUTS & DISTRIBUTIONS
+# ============================================
+/dist/
+/build/
+/out/
+coverage.*
+/coverage/
+*.lcov
+.nyc_output
+
+# ============================================
+# LOG FILES
+# ============================================
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
 
-# Temporary files
+# ============================================
+# TEMPORARY FILES
+# ============================================
 tmp/
-temp/
-.todo
+/tmp/
+/temp/
+*.tmp
+*.temp
+*.pid
+*.seed
+*.pid.lock
+pids/
 
-# Secrets
-secret*
-secret.sh
+# ============================================
+# ENVIRONMENT & CONFIGURATION
+# ============================================
+# Environment variables
 .env
-.env.local
+.env.*
+!.env.example
+.env.test
 .env.development.local
 .env.test.local
 .env.production.local
+.env.local
 
-# Build artifacts
-coverage.txt
-profile.out
+# Application config
+infra/env.local
+cmd/config.json
+secret.json
+http-client.private.env.json
 
-# Misc
+# Custom configs
 *--system_prompt=*
+
+# ============================================
+# USER-SPECIFIC FILES
+# ============================================
+.bashrc
+.bash_history
+.zshrc
+.zsh_history
+*bash-rc*
+tmp/.bash_profile
+
+# ============================================
+# CACHE FILES
+# ============================================
+.cache/
+.eslintcache
+.npm
+.yarn-integrity
+.node_repl_history
+
+# ============================================
+# AIDER (AI Pair Programming)
+# ============================================
+.aider*
+
+# ============================================
+# CERTIFICATES
+# ============================================
+certs/
+
+# ============================================
+# PACKAGE MANAGER LOCK FILES
+# ============================================
+*package-lock.json
+*yarn.lock
+*pnpm-lock.yaml
+
+# ============================================
+# ANTIGRAVITY (Google AI IDE)
+# ============================================
+.antigravity*
+
+# ============================================
+# SCREENSHOTS
+# ============================================
+**/screenshots/
+**/screenshot/
+laxmi/.promote_hash
+varam/.promote_hash
